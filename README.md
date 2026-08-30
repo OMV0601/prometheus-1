@@ -112,7 +112,19 @@ is hardcoded, and a real number we didn't like is worth more than a flattering
 invented one.
 
 <!-- EVIDENCE -->
-_Run `npm run evaluate` to populate this section; the live table is at `/evidence`._
+From a representative run over the ten-passage corpus (`data/evidence.json`):
+
+| | In band | Mean error | Concepts kept |
+|---|---|---|---|
+| **One prompt** | 20% | ±1.58 grades | 89% |
+| **The LEXA loop** | **60%** | **±0.75 grades** | **99%** |
+
+The loop lands in band three times as often, with half the error, at near-perfect
+concept retention — in a mean of 3.0 attempts. It is not 100%: for the densest
+passages (a cell-membrane passage, an electromagnetic-spectrum passage) the tier-3
+vocabulary sets a floor below which Flesch–Kincaid cannot go without cutting a
+concept, so LEXA escalates rather than fake it. That 40% is the honest cost of
+never dropping the science, and it is reported, not hidden.
 <!-- /EVIDENCE -->
 
 The number that matters most is concept retention: the one-shot silently drops
