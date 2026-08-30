@@ -8,7 +8,8 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "evaluate": "tsx scripts/evaluate.ts"
+    "evaluate": "tsx scripts/evaluate.ts",
+    "generate-demo": "tsx scripts/generate-demo.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
