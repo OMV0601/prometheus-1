@@ -281,7 +281,7 @@ export async function runBand(
 export async function runPipeline(source: string, bands: Band[], emit: Emit): Promise<void> {
   const started = Date.now();
   emit({ type: "meta", bands, cached: false, source });
-
+//
   const analysis = await analyze(source);
   emit({ type: "analysis", analysis });
 
