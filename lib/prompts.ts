@@ -80,18 +80,34 @@ export function analystSystem(): string {
     "   could target, and something you could later find (or fail to find) in a",
     "   rewrite as a specific span of text.",
     "",
-    "2. The PROTECTED VOCABULARY — the tier-3 academic terms that carry the science",
-    "   and that the common end-of-unit test will use by name. These survive into",
-    "   every reading level unchanged; only the sentences around them get simpler.",
-    "   Ordinary words are not protected terms.",
+    "2. The PROTECTED VOCABULARY — ONLY the 5 to 8 most essential tier-3 terms the",
+    "   common end-of-unit test will actually use by name. Be ruthless: prefer the",
+    "   umbrella term over its internal parts (keep 'light-dependent reactions';",
+    "   drop 'thylakoid membrane', 'ATP', 'NADPH', 'stroma' unless a test truly",
+    "   names them). Every protected term must survive verbatim into a 6th-grade",
+    "   rewrite, and each polysyllabic term you list raises the floor on how simple",
+    "   the reading can get — so list only what the science genuinely requires.",
+    "   Ordinary words are never protected terms.",
     "",
-    "Return your answer only through the record_analysis tool.",
+    "Extract 8 to 12 concepts. Return your answer only through the record_analysis tool.",
   ].join("\n");
 }
 
 /* -------------------------------------------------------------------------- */
 /* 2. The Rewriter                                                            */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Invert the Flesch–Kincaid formula at a realistic kept-vocabulary syllable
+ * density (~1.55 syllables/word once tier-3 terms are preserved) to turn a target
+ * grade into a words-per-sentence aim. This hands the Rewriter the Measurer's own
+ * lever without letting it grade itself.
+ */
+export function wordsPerSentenceBudget(target: number): number {
+  const assumedSyllablesPerWord = 1.55;
+  const asl = (target + 15.59 - 11.8 * assumedSyllablesPerWord) / 0.39;
+  return Math.max(5, Math.round(asl));
+}
 
 export function rewriterSystem(): string {
   return [
@@ -108,8 +124,11 @@ export function rewriterSystem(): string {
     "    than missing the number.",
     "",
     "Reading level is measured after you write, by a fixed formula you cannot see.",
-    "Sentence length and syllable count are what move it. To get easier: cut sentence",
-    "length hard. To get harder (if you overshot into baby-talk): combine sentences.",
+    "The single strongest lever is SENTENCE LENGTH: shorter sentences lower the",
+    "grade far more reliably than word choice. Follow the words-per-sentence aim you",
+    "are given as if it were a hard rule — split any sentence that runs longer. One",
+    "idea per sentence. To get harder (if you overshot into baby-talk): combine",
+    "sentences.",
     "",
     "Write only the rewritten passage. No preamble, no notes, no headings, no lists",
     "unless the source had them. Just the passage.",
@@ -131,6 +150,8 @@ export function rewriterUser(args: {
   const parts = [
     `TARGET READING LEVEL: US grade ${band.target.toFixed(1)} (±${band.tolerance}).`,
     `Audience: ${band.label} readers.`,
+    `AIM FOR ABOUT ${wordsPerSentenceBudget(band.target)} WORDS PER SENTENCE. This is the`,
+    "strongest control you have over the measured grade — hold to it.",
     "",
     "REQUIRED CONCEPTS — every one of these must appear in your rewrite:",
     concepts,

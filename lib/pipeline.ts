@@ -336,14 +336,26 @@ function buildFailureReason(attempt: Attempt, band: Band, analysis: Analysis): s
     )}, but the target is ${band.target.toFixed(1)} ± ${band.tolerance}.`,
   ];
 
+  // Adaptive budget: invert Flesch–Kincaid using THIS attempt's own measured
+  // syllables-per-word, so the words-per-sentence aim we hand back is exact for
+  // this passage's vocabulary rather than a generic estimate. This is what makes
+  // the loop converge instead of oscillate: FK = 0.39·ASL + 11.8·ASW − 15.59, so
+  // the sentence length needed to hit the target is (T + 15.59 − 11.8·ASW)/0.39.
+  const measuredAsw = attempt.readability.avgSyllablesPerWord;
+  const currentAsl = attempt.readability.avgSentenceLength;
+  const neededAsl = Math.max(3, Math.round((band.target + 15.59 - 11.8 * measuredAsw) / 0.39));
   if (attempt.rejections.includes("too_hard")) {
     lines.push(
-      "It reads TOO HARD. Shorten sentences further and swap ordinary long words for short ones — but keep every required concept and every protected term.",
+      `It reads TOO HARD. Your sentences average ${currentAsl.toFixed(
+        1,
+      )} words; make them average about ${neededAsl} words instead. Split every sentence longer than that into two, and prefer short everyday words for everything that is not a protected term. Keep every required concept and every protected term.`,
     );
   }
   if (attempt.rejections.includes("too_easy")) {
     lines.push(
-      "It reads TOO EASY — you overshot into baby-talk. Combine some sentences and restore natural phrasing, without dropping any concept.",
+      `It reads TOO EASY — you overshot. Your sentences average ${currentAsl.toFixed(
+        1,
+      )} words; lengthen them toward about ${neededAsl} words by combining short sentences, and restore natural phrasing, without dropping any concept.`,
     );
   }
   const missingTerms = attempt.terms.filter((t) => !t.present).map((t) => `"${t.term}"`);
@@ -403,13 +415,24 @@ function textOf(msg: Anthropic.Message): string {
     .trim();
 }
 
-/** Guard against a model that returns malformed ids or empty fields. */
+/**
+ * Guard against a model that returns malformed ids or empty fields, and cap the
+ * counts. The caps are a floor-control safeguard, not cosmetic: every extra
+ * polysyllabic protected term raises the minimum achievable reading grade, so an
+ * over-eager Analyst can make every band impossible. Concepts are re-id'd
+ * sequentially so highlights and audits always line up.
+ */
+const MAX_CONCEPTS = 12;
+const MAX_TERMS = 8;
+
 function normalizeAnalysis(raw: Analysis): Analysis {
   const concepts = (raw.concepts ?? [])
     .filter((c) => c.text?.trim())
-    .map((c, i) => ({ id: c.id?.trim() || `c${i + 1}`, text: c.text.trim() }));
+    .slice(0, MAX_CONCEPTS)
+    .map((c, i) => ({ id: `c${i + 1}`, text: c.text.trim() }));
   const protectedTerms = (raw.protectedTerms ?? [])
     .filter((t) => t.term?.trim())
+    .slice(0, MAX_TERMS)
     .map((t) => ({ term: t.term.trim(), gloss: (t.gloss ?? "").trim() }));
   return { concepts, protectedTerms };
 }

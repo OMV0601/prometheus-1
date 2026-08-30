@@ -17,6 +17,8 @@ export interface Column {
   band: Band;
   outcome: BandOutcome;
   final: Attempt;
+  /** Total attempts made — used to describe an escalation honestly. */
+  attemptCount: number;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
@@ -28,10 +30,12 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Lock({ final, outcome }: { final: Attempt; outcome: BandOutcome }) {
+function Lock({ final }: { final: Attempt; outcome: BandOutcome }) {
+  // The Fidelity Lock is about CONCEPTS, not reading level: a band can miss the
+  // grade and still have kept every concept. Green means nothing was cut.
   const full = final.audit.retained === final.audit.total && final.termsAllPresent;
-  const color = outcome === "PASS" && full ? "var(--color-pass)" : "var(--color-fail)";
-  const bg = outcome === "PASS" && full ? "var(--color-pass-soft)" : "var(--color-fail-soft)";
+  const color = full ? "var(--color-pass)" : "var(--color-fail)";
+  const bg = full ? "var(--color-pass-soft)" : "var(--color-fail-soft)";
   return (
     <span className="num inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[0.75rem] font-semibold"
       style={{ color, background: bg }}>
@@ -66,7 +70,7 @@ export default function ThreeColumnView({
               </div>
               {escalated && (
                 <p className="mt-1.5 text-[0.75rem]" style={{ color: "var(--color-fail)" }}>
-                  Closest attempt shown — escalated to teacher after {col.final.n} tries.
+                  Closest of {col.attemptCount} attempts — escalated to teacher, every concept kept.
                 </p>
               )}
               <div className="mt-4 grid grid-cols-4 gap-3 border-y border-rule py-2.5">

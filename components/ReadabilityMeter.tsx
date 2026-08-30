@@ -52,8 +52,9 @@ export default function ReadabilityMeter({
         </span>
       </div>
 
-      {/* The band */}
-      <div className="relative h-14">
+      {/* The band. Extra top margin leaves clear air for the value bubble, which
+          floats above the tick and would otherwise collide with the label row. */}
+      <div className="relative mt-9 h-14">
         {/* baseline track */}
         <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-[var(--color-rule-strong)]" />
 

@@ -210,11 +210,19 @@ export default function Studio({
         .filter((b): b is LiveBand & { final: NonNullable<LiveBand["final"]>; outcome: NonNullable<LiveBand["outcome"]> } =>
           Boolean(b?.final && b?.outcome),
         )
-        .map((b) => ({ band: b.band, outcome: b.outcome, final: b.final })),
+        .map((b) => ({
+          band: b.band,
+          outcome: b.outcome,
+          final: b.final,
+          attemptCount: b.attempts.length,
+        })),
     [state.order, state.bands],
   );
 
-  const midBand = doneColumns.find((c) => c.band.id === "mid") ?? doneColumns[0];
+  // The baseline comparison uses the most aggressive band, because that is where
+  // the one-shot's failure is starkest: it chases the number by silently cutting
+  // concepts. LEXA's honest escalation there is the restraint story.
+  const baselineColumn = doneColumns.find((c) => c.band.id === "low") ?? doneColumns[0];
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-6 pb-24">
@@ -260,13 +268,14 @@ export default function Studio({
               />
               <ThreeColumnView columns={doneColumns} analysis={state.analysis} />
 
-              {midBand && (
+              {baselineColumn && (
                 <>
                   <SectionHeader kicker="The comparison" title="One prompt vs. LEXA" />
                   <BaselinePanel
                     source={state.source}
-                    band={midBand.band}
-                    lexaFinal={midBand.final}
+                    band={baselineColumn.band}
+                    lexaFinal={baselineColumn.final}
+                    lexaOutcome={baselineColumn.outcome}
                     analysis={state.analysis}
                     cached={state.cached}
                   />
