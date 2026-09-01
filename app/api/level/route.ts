@@ -76,6 +76,10 @@ export async function POST(req: Request) {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      // Proxies in front of the function (Vercel's CDN, nginx) will happily
+      // buffer a response body and hand it over in one piece, which turns the
+      // live meter into a frozen screen that fills in at the end. Opt out.
+      "X-Accel-Buffering": "no",
     },
   });
 }
