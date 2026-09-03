@@ -7,7 +7,7 @@
  * This panel is the visual answer to "can't they just use ChatGPT?"
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Analysis, Attempt, Band, BandOutcome, BaselineResult } from "@/lib/types";
 
 function GradeBadge({
@@ -48,6 +48,7 @@ export default function BaselinePanel({
   lexaOutcome,
   analysis,
   cached,
+  forceOpen = false,
 }: {
   source: string;
   band: Band;
@@ -55,6 +56,8 @@ export default function BaselinePanel({
   lexaOutcome: BandOutcome;
   analysis: Analysis;
   cached: boolean;
+  /** The auto demo opens the panel on cue instead of waiting for a click. */
+  forceOpen?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -82,6 +85,12 @@ export default function BaselinePanel({
     }
   }
 
+  // The auto demo asks for the panel on a timed cue; same path as a click.
+  useEffect(() => {
+    if (forceOpen && !open) void reveal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceOpen]);
+
   if (!open) {
     return (
       <button
@@ -106,7 +115,7 @@ export default function BaselinePanel({
       </div>
       <div className="grid gap-px bg-rule md:grid-cols-2">
         {/* One-shot */}
-        <div className="bg-panel p-6">
+        <div data-demo="oneshot" className="bg-panel p-6">
           <h3 className="mb-1 text-[0.95rem] font-semibold tracking-tight">One prompt</h3>
           <p className="mb-4 text-[0.8125rem] text-muted">
             “Rewrite this at a {Math.round(band.target)}th grade reading level.” Same model. No
@@ -153,7 +162,7 @@ export default function BaselinePanel({
         </div>
 
         {/* LEXA */}
-        <div className="bg-panel p-6">
+        <div data-demo="lexa" className="bg-panel p-6">
           <h3 className="mb-1 text-[0.95rem] font-semibold tracking-tight">LEXA</h3>
           <p className="mb-4 text-[0.8125rem] text-muted">
             Measured, retried until in band, audited for every concept.

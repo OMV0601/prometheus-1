@@ -122,3 +122,25 @@ body {
     background: #fff;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Auto demo                                                                  */
+/*                                                                            */
+/* The scripted walkthrough raises one element at a time. Kept deliberately    */
+/* quiet: a ring and a faint halo, no scale or colour shift, because this is   */
+/* screen-recorded and a loud effect would date the video badly.               */
+/* -------------------------------------------------------------------------- */
+
+[data-demo] {
+  transition:
+    box-shadow 450ms ease,
+    background-color 450ms ease;
+  scroll-margin-top: 5rem;
+}
+
+[data-demo][data-spot="true"] {
+  box-shadow:
+    0 0 0 2px var(--color-rule-strong),
+    0 0 0 10px rgba(26, 26, 23, 0.035);
+  background-color: var(--color-panel);
+}

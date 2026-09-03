@@ -21,6 +21,15 @@ export const maxDuration = 60;
 interface Body {
   source?: string;
   image?: { base64: string; mediaType: string };
+  /**
+   * Auto-demo only. Forces the cached replay regardless of key, and paces it to
+   * fill a fixed slot: the walkthrough is timed to narration recorded separately,
+   * so the run has to take the same wall-clock time on every take. A live run
+   * cannot promise that.
+   */
+  demo?: boolean;
+  /** Replay speed multiplier. <1 stretches the run; ignored unless demo. */
+  speed?: number;
 }
 
 export async function POST(req: Request) {
@@ -40,10 +49,12 @@ export async function POST(req: Request) {
         controller.close();
       };
 
-      // No key at all → cached run, honestly badged.
-      if (!hasApiKey()) {
+      // No key at all, or the auto demo asking for a deterministic run → cached
+      // run, honestly badged either way.
+      if (body.demo || !hasApiKey()) {
         const cached = loadCachedRun();
-        if (cached) await replayRun(cached, send);
+        const speed = body.demo && body.speed && body.speed > 0 ? body.speed : 1;
+        if (cached) await replayRun(cached, send, { speed });
         else send({ type: "error", message: "No API key and no cached run available." });
         return close();
       }

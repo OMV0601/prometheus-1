@@ -8,12 +8,15 @@
  * from the server, produced by lib/readability.ts.
  */
 
-import { useCallback, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import Link from "next/link";
 import BandColumn from "./BandColumn";
 import ThreeColumnView, { type Column } from "./ThreeColumnView";
 import BaselinePanel from "./BaselinePanel";
 import { initLiveBand, type LiveBand } from "./live";
+import DemoHud from "./DemoHud";
+import { useAutoDemo } from "./useAutoDemo";
+import { CONCEPT_TOUR, REPLAY_SPEED } from "./autoDemo";
 import type { Analysis, Band, RunEvent } from "@/lib/types";
 
 interface RosterStats {
@@ -49,10 +52,13 @@ const emptyState = (): State => ({
   error: null,
 });
 
-type Action = { type: "reset" } | { type: "event"; event: RunEvent };
+type Action = { type: "reset" } | { type: "idle" } | { type: "event"; event: RunEvent };
 
 function reducer(state: State, action: Action): State {
   if (action.type === "reset") return { ...emptyState(), phase: "running" };
+  // Back to the input view with nothing retained. The auto demo resets between
+  // takes this way instead of reloading, which would lose the whole page.
+  if (action.type === "idle") return emptyState();
 
   const ev = action.event;
   switch (ev.type) {
@@ -185,6 +191,35 @@ export default function Studio({
     void parseStream(JSON.stringify({ source: text }));
   }, [parseStream, text]);
 
+  /* ---- Auto demo -------------------------------------------------------- */
+
+  // Highlight driven by the script. `undefined` hands control back to the mouse.
+  const [demoConcept, setDemoConcept] = useState<string | null | undefined>(undefined);
+  const [demoBaseline, setDemoBaseline] = useState(false);
+  const [showHud, setShowHud] = useState(false);
+  const analysisRef = useRef<Analysis | null>(null);
+  analysisRef.current = state.analysis;
+
+  // The demo always replays the captured run, stretched to fill its slot, so the
+  // footage is identical on every take and can be cut against fixed timestamps.
+  const runDemo = useCallback(() => {
+    void parseStream(JSON.stringify({ source: text, demo: true, speed: REPLAY_SPEED }));
+  }, [parseStream, text]);
+
+  const demo = useAutoDemo({
+    onRun: runDemo,
+    onIdle: () => dispatch({ type: "idle" }),
+    setConcept: (id) => setDemoConcept(id),
+    setBaselineOpen: setDemoBaseline,
+    getConceptIds: () => analysisRef.current?.concepts.map((c) => c.id) ?? [],
+    conceptTour: CONCEPT_TOUR,
+  });
+
+  // Release the scripted highlight once a take ends so the page is interactive.
+  useEffect(() => {
+    if (!demo.active) setDemoConcept(undefined);
+  }, [demo.active]);
+
   const runImage = useCallback(
     async (file: File) => {
       const base64 = await fileToBase64(file);
@@ -225,8 +260,19 @@ export default function Studio({
   const baselineColumn = doneColumns.find((c) => c.band.id === "low") ?? doneColumns[0];
 
   return (
-    <div className="mx-auto w-full max-w-[1400px] px-6 pb-24">
-      <Masthead cached={state.cached && state.phase !== "input"} />
+    <div
+      className="mx-auto w-full max-w-[1400px] px-6 pb-24"
+      style={demo.active && showHud ? { paddingTop: "2.75rem" } : undefined}
+    >
+      {demo.active && showHud && <DemoHud elapsed={demo.elapsed} />}
+      <Masthead
+        cached={state.cached && state.phase !== "input"}
+        demoActive={demo.active}
+        onStartDemo={demo.start}
+        onAbortDemo={demo.abort}
+        showHud={showHud}
+        onToggleHud={() => setShowHud((v) => !v)}
+      />
 
       {state.phase === "input" ? (
         <InputPanel
@@ -261,16 +307,24 @@ export default function Studio({
 
           {state.phase === "done" && state.analysis && doneColumns.length > 0 && (
             <>
-              <SectionHeader
-                kicker="Same lesson · same test · different reading level"
-                title="Three levels, side by side"
-                note="Hover any highlight — the same concept lifts in all three columns."
-              />
-              <ThreeColumnView columns={doneColumns} analysis={state.analysis} />
+              <div data-demo="columns">
+                <SectionHeader
+                  kicker="Same lesson · same test · different reading level"
+                  title="Three levels, side by side"
+                  note="Hover any highlight — the same concept lifts in all three columns."
+                />
+                <ThreeColumnView
+                  columns={doneColumns}
+                  analysis={state.analysis}
+                  activeConcept={demoConcept}
+                />
+              </div>
 
               {baselineColumn && (
                 <>
-                  <SectionHeader kicker="The comparison" title="One prompt vs. LEXA" />
+                  <div data-demo="comparison">
+                    <SectionHeader kicker="The comparison" title="One prompt vs. LEXA" />
+                  </div>
                   <BaselinePanel
                     source={state.source}
                     band={baselineColumn.band}
@@ -278,11 +332,14 @@ export default function Studio({
                     lexaOutcome={baselineColumn.outcome}
                     analysis={state.analysis}
                     cached={state.cached}
+                    forceOpen={demoBaseline}
                   />
                 </>
               )}
 
-              <Footer />
+              <div data-demo="footer">
+                <Footer />
+              </div>
             </>
           )}
         </div>
@@ -295,7 +352,21 @@ export default function Studio({
 /* Sub-views                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function Masthead({ cached }: { cached: boolean }) {
+function Masthead({
+  cached,
+  demoActive,
+  onStartDemo,
+  onAbortDemo,
+  showHud,
+  onToggleHud,
+}: {
+  cached: boolean;
+  demoActive: boolean;
+  onStartDemo: () => void;
+  onAbortDemo: () => void;
+  showHud: boolean;
+  onToggleHud: () => void;
+}) {
   return (
     <header className="flex items-center justify-between border-b border-rule py-5">
       <div className="flex items-baseline gap-3">
@@ -319,6 +390,29 @@ function Masthead({ cached }: { cached: boolean }) {
         <Link href="/print" className="label hover:text-ink">
           Handout
         </Link>
+
+        {/* Rehearsal aid. Off by default: the walkthrough is screen-recorded and
+            anything drawn on top of it is burned into the final video. */}
+        <button
+          onClick={onToggleHud}
+          title="Timing overlay: on to rehearse, off for the take"
+          className="label hover:text-ink"
+          style={{ color: showHud ? "var(--color-ink)" : undefined }}
+        >
+          Timing {showHud ? "on" : "off"}
+        </button>
+
+        <button
+          onClick={demoActive ? onAbortDemo : onStartDemo}
+          className="border border-ink px-3 py-1.5 text-[0.6875rem] font-semibold uppercase tracking-widest transition-colors hover:bg-ink hover:text-paper"
+          style={
+            demoActive
+              ? { borderColor: "var(--color-fail)", color: "var(--color-fail)" }
+              : undefined
+          }
+        >
+          {demoActive ? "Stop (esc)" : "Auto demo"}
+        </button>
       </nav>
     </header>
   );
@@ -368,6 +462,7 @@ function InputPanel({
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
+          data-demo="passage"
           className="mt-8 border border-rule bg-panel transition-colors"
           style={{ borderColor: dragging ? "var(--color-ink)" : undefined }}
         >
@@ -415,7 +510,7 @@ function InputPanel({
 
       <aside className="lg:pt-2">
         <SectionHeader kicker="4th period · science" title="The class" />
-        <dl className="mt-4 divide-y divide-rule border-y border-rule">
+        <dl data-demo="roster" className="mt-4 divide-y divide-rule border-y border-rule">
           <RosterRow k="Students" v={String(rosterStats.total)} />
           <RosterRow k="Read at or below grade 5" v={String(rosterStats.atOrBelow5)} />
           <RosterRow k="Newcomer English learners" v={String(rosterStats.ell)} />
@@ -425,7 +520,7 @@ function InputPanel({
           Roster is synthetic — no real student data.
         </p>
 
-        <div className="mt-8">
+        <div className="mt-8" data-demo="bands">
           <SectionHeader kicker="Derived from the roster" title="Target bands" />
           <ul className="mt-4 space-y-2">
             {bands.map((b) => (

@@ -50,11 +50,22 @@ function Lock({ final }: { final: Attempt; outcome: BandOutcome }) {
 export default function ThreeColumnView({
   columns,
   analysis,
+  activeConcept,
 }: {
   columns: Column[];
   analysis: Analysis;
+  /**
+   * When set, the auto demo is driving the highlight and pointer hover is
+   * ignored. Undefined leaves the component in its normal interactive mode.
+   */
+  activeConcept?: string | null;
 }) {
-  const [active, setActive] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const driven = activeConcept !== undefined;
+  const active = driven ? activeConcept : hovered;
+  const setActive = (id: string | null) => {
+    if (!driven) setHovered(id);
+  };
 
   return (
     <div className="grid gap-px bg-rule md:grid-cols-3">
